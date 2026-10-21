@@ -1,0 +1,6 @@
+{
+  "name": "PORTIVA - Manajemen Muatan Kapal & Penumpang",
+  "description": "Aplikasi manajemen operasional pelayaran, muatan kapal, data penumpang, manifest digital ber-QR code, dan audit trail real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
