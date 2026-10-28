@@ -1054,38 +1054,185 @@ app.get('/api/manifests/voyage/:voyageId', authenticate, (req: Request, res: Res
   });
 });
 
-// --- QR CODE VERIFICATION LOOKUP ---
+// --- UNIVERSAL QR CODE VERIFICATION LOOKUP (MANIFEST, PASSENGER, CARGO) ---
 app.post('/api/manifests/verify-qr', authenticate, (req: Request, res: Response) => {
   const { qr_string } = req.body;
-  if (!qr_string) {
+  if (!qr_string || typeof qr_string !== 'string') {
     return res.status(400).json({ success: false, message: 'Kode QR wajib disertakan!' });
   }
 
+  const cleanQuery = qr_string.trim();
   const db = readDB();
-  const manifest = db.manifests.find((m) => m.qr_code_data === qr_string || qr_string.includes(m.manifest_number));
 
-  if (!manifest) {
-    return res.status(404).json({
-      success: false,
-      message: 'Kode QR tidak valid atau dokumen manifest tidak ditemukan dalam sistem resmi PORTIVA!',
+  // 1. Check for Manifest
+  const manifest = db.manifests.find(
+    (m) =>
+      m.qr_code_data === cleanQuery ||
+      cleanQuery.includes(m.manifest_number) ||
+      m.manifest_number.toLowerCase() === cleanQuery.toLowerCase() ||
+      cleanQuery.includes(m.id)
+  );
+
+  if (manifest) {
+    const voyage = db.voyages.find((v) => v.id === manifest.voyage_id);
+    const ship = voyage ? db.ships.find((s) => s.id === voyage.ship_id) : null;
+    const originPort = voyage ? db.ports.find((p) => p.id === voyage.origin_port_id) : null;
+    const destPort = voyage ? db.ports.find((p) => p.id === voyage.destination_port_id) : null;
+
+    return res.json({
+      success: true,
+      doc_type: 'MANIFEST',
+      message: 'Dokumen Manifest Resmi Syahbandar Terverifikasi!',
+      data: {
+        doc_type: 'MANIFEST',
+        manifest,
+        voyage,
+        ship,
+        originPort,
+        destPort,
+      },
     });
   }
 
-  const voyage = db.voyages.find((v) => v.id === manifest.voyage_id);
-  const ship = voyage ? db.ships.find((s) => s.id === voyage.ship_id) : null;
-  const originPort = voyage ? db.ports.find((p) => p.id === voyage.origin_port_id) : null;
-  const destPort = voyage ? db.ports.find((p) => p.id === voyage.destination_port_id) : null;
+  // 2. Check for Passenger Ticket
+  const ticket = db.passenger_transactions.find(
+    (t) =>
+      cleanQuery.includes(t.ticket_number) ||
+      t.ticket_number.toLowerCase() === cleanQuery.toLowerCase() ||
+      t.id === cleanQuery
+  );
+
+  if (ticket) {
+    const passenger = db.passengers.find((p) => p.id === ticket.passenger_id);
+    const voyage = db.voyages.find((v) => v.id === ticket.voyage_id);
+    const ship = voyage ? db.ships.find((s) => s.id === voyage.ship_id) : null;
+    const originPort = voyage ? db.ports.find((p) => p.id === voyage.origin_port_id) : null;
+    const destPort = voyage ? db.ports.find((p) => p.id === voyage.destination_port_id) : null;
+
+    return res.json({
+      success: true,
+      doc_type: 'PASSENGER_TICKET',
+      message: 'Tiket Penumpang Resmi Terverifikasi!',
+      data: {
+        doc_type: 'PASSENGER_TICKET',
+        ticket,
+        passenger,
+        voyage,
+        ship,
+        originPort,
+        destPort,
+      },
+    });
+  }
+
+  // 3. Check for Cargo Transaction (Bill of Lading / Resi)
+  const cargo = db.cargo_transactions.find(
+    (c) =>
+      cleanQuery.includes(c.document_number) ||
+      c.document_number.toLowerCase() === cleanQuery.toLowerCase() ||
+      c.id === cleanQuery
+  );
+
+  if (cargo) {
+    const customer = db.customers.find((cust) => cust.id === cargo.customer_id);
+    const cargoType = db.cargo_types.find((ct) => ct.id === cargo.cargo_type_id);
+    const voyage = db.voyages.find((v) => v.id === cargo.voyage_id);
+    const ship = voyage ? db.ships.find((s) => s.id === voyage.ship_id) : null;
+    const loadPort = db.ports.find((p) => p.id === cargo.loading_port_id);
+    const disPort = db.ports.find((p) => p.id === cargo.discharge_port_id);
+
+    return res.json({
+      success: true,
+      doc_type: 'CARGO_DOCUMENT',
+      message: 'Dokumen Muatan / Bill of Lading Terverifikasi!',
+      data: {
+        doc_type: 'CARGO_DOCUMENT',
+        cargo,
+        customer,
+        cargoType,
+        voyage,
+        ship,
+        loadingPort: loadPort,
+        dischargePort: disPort,
+      },
+    });
+  }
+
+  return res.status(404).json({
+    success: false,
+    message: `Data tidak ditemukan untuk kode "${cleanQuery}". Pastikan kode QR merupakan Manifest, Tiket Penumpang, atau Dokumen Muatan PORTIVA.`,
+  });
+});
+
+// Quick action: Update passenger boarding status directly from scanner
+app.post('/api/verify-qr/check-in-passenger', authenticate, (req: Request, res: Response) => {
+  const { ticket_id, new_status = 'Boarded' } = req.body;
+  const db = readDB();
+  const admin = (req as any).admin;
+  const ticket = db.passenger_transactions.find((t) => t.id === ticket_id || t.ticket_number === ticket_id);
+
+  if (!ticket) {
+    return res.status(404).json({ success: false, message: 'Tiket penumpang tidak ditemukan.' });
+  }
+
+  const oldStatus = ticket.boarding_status;
+  ticket.boarding_status = new_status;
+  ticket.updated_at = new Date().toISOString();
+  saveDB(db);
+
+  logAudit(
+    admin?.full_name,
+    admin?.role,
+    'passenger_transactions',
+    ticket.id,
+    'UPDATE',
+    { boarding_status: oldStatus },
+    { boarding_status: new_status },
+    `Petugas memvalidasi boarding tiket ${ticket.ticket_number} menjadi ${new_status} via QR Scanner.`
+  );
+
+  broadcastEvent('PASSENGER_TRANSACTIONS_UPDATED', ticket);
 
   return res.json({
     success: true,
-    message: 'Dokumen Manifest Terverifikasi Resmi!',
-    data: {
-      manifest,
-      voyage,
-      ship,
-      originPort,
-      destPort,
-    },
+    message: `Status boarding tiket ${ticket.ticket_number} berhasil diubah menjadi ${new_status}!`,
+    data: ticket,
+  });
+});
+
+// Quick action: Update cargo status directly from scanner
+app.post('/api/verify-qr/update-cargo-status', authenticate, (req: Request, res: Response) => {
+  const { cargo_id, new_status = 'Loaded' } = req.body;
+  const db = readDB();
+  const admin = (req as any).admin;
+  const cargo = db.cargo_transactions.find((c) => c.id === cargo_id || c.document_number === cargo_id);
+
+  if (!cargo) {
+    return res.status(404).json({ success: false, message: 'Dokumen muatan tidak ditemukan.' });
+  }
+
+  const oldStatus = cargo.status;
+  cargo.status = new_status;
+  cargo.updated_at = new Date().toISOString();
+  saveDB(db);
+
+  logAudit(
+    admin?.full_name,
+    admin?.role,
+    'cargo_transactions',
+    cargo.id,
+    'UPDATE',
+    { status: oldStatus },
+    { status: new_status },
+    `Status muatan B/L ${cargo.document_number} diperbarui menjadi ${new_status} via QR Scanner.`
+  );
+
+  broadcastEvent('CARGO_TRANSACTIONS_UPDATED', cargo);
+
+  return res.json({
+    success: true,
+    message: `Status muatan ${cargo.item_name} berhasil diubah menjadi ${new_status}!`,
+    data: cargo,
   });
 });
 

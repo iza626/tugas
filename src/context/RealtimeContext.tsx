@@ -2,20 +2,26 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { RealtimeToast } from '../types';
 import { subscribeLocalEvents } from '../services/api';
 
+interface RealtimeEvent {
+  type: string;
+  payload?: any;
+  timestamp: number;
+}
+
 interface RealtimeContextType {
   isConnected: boolean;
   toasts: RealtimeToast[];
+  lastEvent: RealtimeEvent | null;
   addToast: (toast: Omit<RealtimeToast, 'id' | 'timestamp'>) => void;
   removeToast: (id: string) => void;
-  lastEvent: { type: string; payload: any } | null;
 }
 
 const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
 export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
   const [toasts, setToasts] = useState<RealtimeToast[]>([]);
-  const [lastEvent, setLastEvent] = useState<{ type: string; payload: any } | null>(null);
+  const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
 
   const addToast = useCallback((toast: Omit<RealtimeToast, 'id' | 'timestamp'>) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -27,7 +33,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
 
-    // Auto dismiss after 6 seconds
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 6000);
@@ -37,100 +42,85 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Listen for broadcast events from Firestore real-time listeners & local changes
   useEffect(() => {
+    const unsubscribe = subscribeLocalEvents((eventName, payload) => {
+      setLastEvent({
+        type: eventName,
+        payload,
+        timestamp: Date.now(),
+      });
+      setIsConnected(true);
+
+      // Trigger user-friendly real-time notification
+      if (eventName === 'SHIPS_CREATED' || eventName === 'SHIPS_UPDATED') {
+        addToast({
+          type: 'info',
+          title: 'Update Data Kapal Real-time',
+          message: `${payload?.name || 'Kapal'} telah diperbarui dalam database.`,
+        });
+      } else if (eventName === 'VOYAGES_UPDATED' || eventName === 'VOYAGES_CREATED') {
+        addToast({
+          type: 'info',
+          title: 'Perjalanan Kapal Diperbarui',
+          message: `Status pelayaran ${payload?.voyage_number || ''} (${payload?.status || ''}) disinkronkan.`,
+        });
+      } else if (eventName === 'MANIFEST_CERTIFIED') {
+        addToast({
+          type: 'success',
+          title: 'Manifest Disahkan Syahbandar',
+          message: `Manifest ${payload?.manifest?.manifest_number || ''} telah divalidasi dengan QR code resmi.`,
+        });
+      } else if (eventName === 'PASSENGERS_CREATED' || eventName === 'PASSENGERS_UPDATED') {
+        addToast({
+          type: 'info',
+          title: 'Data Penumpang Diperbarui',
+          message: `${payload?.full_name || 'Penumpang'} berhasil dicatat.`,
+        });
+      } else if (eventName === 'CARGO_CREATED' || eventName === 'CARGO_UPDATED') {
+        addToast({
+          type: 'info',
+          title: 'Transaksi Muatan Kargo',
+          message: `Muatan ${payload?.item_name || 'Kargo'} berhasil dicatat ke sistem.`,
+        });
+      }
+    });
+
+    // Also attempt SSE stream if server is running full-stack
     let eventSource: EventSource | null = null;
-    let retryTimeout: any = null;
-
-    const connectSSE = () => {
+    try {
       eventSource = new EventSource('/api/realtime/events');
-
-      eventSource.addEventListener('CONNECTED', (e: MessageEvent) => {
-        setIsConnected(true);
-      });
-
-      eventSource.addEventListener('MANIFEST_CERTIFIED', (e: MessageEvent) => {
+      eventSource.onopen = () => setIsConnected(true);
+      eventSource.onmessage = (e) => {
         try {
-          const data = JSON.parse(e.data);
-          setLastEvent({ type: 'MANIFEST_CERTIFIED', payload: data });
-          addToast({
-            type: 'success',
-            title: 'Manifest Kapal Disahkan!',
-            message: data.message || `Manifest ${data.manifest?.manifest_number} resmi disahkan dengan QR Syahbandar.`,
+          const parsed = JSON.parse(e.data);
+          setLastEvent({
+            type: parsed.event || 'UPDATE',
+            payload: parsed.data,
+            timestamp: Date.now(),
           });
-        } catch (err) {
-          // ignore parse error
-        }
-      });
-
-      const handleGenericEvent = (type: string, title: string) => (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          setLastEvent({ type, payload: data });
-          if (type.includes('DELETED')) {
-            addToast({
-              type: 'warning',
-              title,
-              message: `Data dengan ID [${data.id}] telah dihapus dari database.`,
-            });
-          } else if (type.includes('CREATED')) {
-            addToast({
-              type: 'info',
-              title,
-              message: `Data baru berhasil disimpan secara real-time ke sistem.`,
-            });
-          }
         } catch (err) {
           // ignore
         }
       };
-
-      eventSource.addEventListener('SHIPS_CREATED', handleGenericEvent('SHIPS_CREATED', 'Data Kapal Ditambahkan'));
-      eventSource.addEventListener('SHIPS_UPDATED', handleGenericEvent('SHIPS_UPDATED', 'Data Kapal Diperbarui'));
-      eventSource.addEventListener('SHIPS_DELETED', handleGenericEvent('SHIPS_DELETED', 'Data Kapal Dihapus'));
-
-      eventSource.addEventListener('VOYAGES_CREATED', handleGenericEvent('VOYAGES_CREATED', 'Perjalanan Kapal Baru'));
-      eventSource.addEventListener('VOYAGES_UPDATED', handleGenericEvent('VOYAGES_UPDATED', 'Status Perjalanan Diperbarui'));
-
-      eventSource.addEventListener('CARGO_TRANSACTIONS_CREATED', handleGenericEvent('CARGO_TRANSACTIONS_CREATED', 'Muatan Baru Tercatat'));
-      eventSource.addEventListener('CARGO_TRANSACTIONS_UPDATED', handleGenericEvent('CARGO_TRANSACTIONS_UPDATED', 'Status Muatan Diperbarui'));
-
-      eventSource.addEventListener('PASSENGER_TRANSACTIONS_CREATED', handleGenericEvent('PASSENGER_TRANSACTIONS_CREATED', 'Tiket Penumpang Terbit'));
-
-      eventSource.onopen = () => {
+      eventSource.onerror = () => {
+        // Fall back to broadcast / Firestore without UI breakage
         setIsConnected(true);
       };
-
-      eventSource.onerror = () => {
-        setIsConnected(false);
-        if (eventSource) {
-          eventSource.close();
-        }
-        // retry in 4 seconds
-        retryTimeout = setTimeout(connectSSE, 4000);
-      };
-    };
-
-    connectSSE();
-
-    const unsubscribeLocal = subscribeLocalEvents((type, payload) => {
-      setLastEvent({ type, payload });
+    } catch (e) {
       setIsConnected(true);
-      if (type.includes('CREATED')) {
-        addToast({ type: 'info', title: 'Data Diperbarui', message: 'Data baru tersinkronisasi antar tab.' });
-      } else if (type === 'MANIFEST_CERTIFIED') {
-        addToast({ type: 'success', title: 'Manifest Disahkan!', message: 'Dokumen manifest resmi disahkan.' });
-      }
-    });
+    }
 
     return () => {
-      if (eventSource) eventSource.close();
-      if (retryTimeout) clearTimeout(retryTimeout);
-      unsubscribeLocal();
+      unsubscribe();
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, [addToast]);
 
   return (
-    <RealtimeContext.Provider value={{ isConnected, toasts, addToast, removeToast, lastEvent }}>
+    <RealtimeContext.Provider value={{ isConnected, toasts, lastEvent, addToast, removeToast }}>
       {children}
     </RealtimeContext.Provider>
   );

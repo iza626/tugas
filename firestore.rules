@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isPortivaAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'intannfpipsmg@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Master Data: Kapal
+    match /ships/{shipId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Master Data: Pelabuhan
+    match /ports/{portId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Master Data: Penumpang
+    match /passengers/{passengerId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Master Data: Jenis Muatan
+    match /cargoTypes/{cargoTypeId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Master Data: Pelanggan / Ekspedisi
+    match /customers/{customerId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Transaksi: Perjalanan Kapal (Jadwal & Status)
+    match /voyages/{voyageId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Transaksi: Penumpang & Tiket
+    match /passengerTransactions/{txId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Transaksi: Muatan Kapal (Kargo & Manifest Barang)
+    match /cargoTransactions/{txId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Manifest: Manifest Digital (Dapat diverifikasi via QR scanner publik oleh petugas pelabuhan)
+    match /manifests/{manifestId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Audit Trail: Catatan aktivitas operasional (Append-only)
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // System Admins
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isPortivaAdmin();
+    }
+  }
+}

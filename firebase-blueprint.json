@@ -1,0 +1,239 @@
+{
+  "entities": {
+    "Ship": {
+      "title": "Ship",
+      "description": "Master data for maritime vessels managed in PORTIVA",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "imoNumber": { "type": "string", "maxLength": 32 },
+        "shipType": { "type": "string", "maxLength": 64 },
+        "flag": { "type": "string", "maxLength": 64 },
+        "gt": { "type": "number" },
+        "dwt": { "type": "number" },
+        "passengerCapacity": { "type": "number" },
+        "cargoCapacity": { "type": "number" },
+        "yearBuilt": { "type": "number" },
+        "status": { "type": "string", "enum": ["Aktif", "Tidak Aktif", "Maintenance"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "imoNumber", "shipType", "status"]
+    },
+    "Port": {
+      "title": "Port",
+      "description": "Port master data and terminal locations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 32 },
+        "city": { "type": "string", "maxLength": 64 },
+        "province": { "type": "string", "maxLength": 64 },
+        "country": { "type": "string", "maxLength": 64 },
+        "portType": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["Aktif", "Non-Aktif"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "code", "city", "status"]
+    },
+    "Passenger": {
+      "title": "Passenger",
+      "description": "Passenger information records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 128 },
+        "idNumber": { "type": "string", "maxLength": 64 },
+        "gender": { "type": "string", "enum": ["Laki-laki", "Perempuan"] },
+        "birthDate": { "type": "string", "maxLength": 32 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "address": { "type": "string", "maxLength": 256 },
+        "nationality": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["fullName", "idNumber", "gender"]
+    },
+    "CargoType": {
+      "title": "CargoType",
+      "description": "Classification and measurement units of cargo goods",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "unit": { "type": "string", "maxLength": 32 },
+        "notes": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "category", "unit"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Shipper, consignee, or logistics client partner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyName": { "type": "string", "maxLength": 128 },
+        "picName": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "email": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["companyName", "picName", "phone"]
+    },
+    "Voyage": {
+      "title": "Voyage",
+      "description": "Ship voyage schedule and operational route",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "shipId": { "type": "string", "maxLength": 128 },
+        "shipName": { "type": "string", "maxLength": 128 },
+        "originPortId": { "type": "string", "maxLength": 128 },
+        "originPortName": { "type": "string", "maxLength": 128 },
+        "destinationPortId": { "type": "string", "maxLength": 128 },
+        "destinationPortName": { "type": "string", "maxLength": 128 },
+        "departureTime": { "type": "string", "maxLength": 64 },
+        "estimatedArrival": { "type": "string", "maxLength": 64 },
+        "actualArrival": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["Terjadwal", "Boarding", "Berangkat", "Tiba", "Dibatalkan"] },
+        "notes": { "type": "string", "maxLength": 256 },
+        "passengerCount": { "type": "number" },
+        "cargoCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["shipId", "originPortId", "destinationPortId", "departureTime", "status"]
+    },
+    "PassengerTransaction": {
+      "title": "PassengerTransaction",
+      "description": "Ticketing and boarding record per voyage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "voyageId": { "type": "string", "maxLength": 128 },
+        "passengerId": { "type": "string", "maxLength": 128 },
+        "passengerName": { "type": "string", "maxLength": 128 },
+        "ticketNumber": { "type": "string", "maxLength": 64 },
+        "ticketClass": { "type": "string", "enum": ["Ekonomi", "Bisnis", "VIP"] },
+        "seatNumber": { "type": "string", "maxLength": 32 },
+        "fare": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["Lunas", "Pending", "Batal"] },
+        "boardingStatus": { "type": "string", "enum": ["Belum Check-in", "Check-in", "Boarded"] },
+        "bookingDate": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["voyageId", "passengerId", "ticketNumber", "paymentStatus"]
+    },
+    "CargoTransaction": {
+      "title": "CargoTransaction",
+      "description": "Freight and cargo shipment transaction per voyage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "voyageId": { "type": "string", "maxLength": 128 },
+        "cargoTypeId": { "type": "string", "maxLength": 128 },
+        "cargoTypeName": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 128 },
+        "trackingNumber": { "type": "string", "maxLength": 64 },
+        "weight": { "type": "number" },
+        "volume": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 32 },
+        "fee": { "type": "number" },
+        "status": { "type": "string", "enum": ["Didaftarkan", "Dimuat", "Dalam Perjalanan", "Bongkar", "Selesai"] },
+        "description": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["voyageId", "cargoTypeId", "trackingNumber", "weight", "status"]
+    },
+    "Manifest": {
+      "title": "Manifest",
+      "description": "Certified voyage cargo and passenger manifest with QR code validation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "manifestNumber": { "type": "string", "maxLength": 64 },
+        "voyageId": { "type": "string", "maxLength": 128 },
+        "shipName": { "type": "string", "maxLength": 128 },
+        "route": { "type": "string", "maxLength": 128 },
+        "totalPassengers": { "type": "number" },
+        "totalCargoWeight": { "type": "number" },
+        "certifiedBy": { "type": "string", "maxLength": 128 },
+        "certifiedAt": { "type": "string", "maxLength": 64 },
+        "qrVerificationCode": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Draft", "Disahkan", "Arsip"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["manifestNumber", "voyageId", "status", "qrVerificationCode"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and activity audit records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "action": { "type": "string", "maxLength": 64 },
+        "entity": { "type": "string", "maxLength": 64 },
+        "entityId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 512 },
+        "performedBy": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["action", "entity", "details", "performedBy"]
+    }
+  },
+  "firestore": {
+    "/ships/{shipId}": {
+      "schema": "Ship",
+      "description": "Collection of vessel master data records"
+    },
+    "/ports/{portId}": {
+      "schema": "Port",
+      "description": "Collection of seaport and terminal locations"
+    },
+    "/passengers/{passengerId}": {
+      "schema": "Passenger",
+      "description": "Collection of passenger master data"
+    },
+    "/cargoTypes/{cargoTypeId}": {
+      "schema": "CargoType",
+      "description": "Collection of cargo category and unit definitions"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Collection of freight logistics customer partners"
+    },
+    "/voyages/{voyageId}": {
+      "schema": "Voyage",
+      "description": "Collection of voyage voyages and departure schedules"
+    },
+    "/passengerTransactions/{transactionId}": {
+      "schema": "PassengerTransaction",
+      "description": "Collection of passenger ticket and boarding transactions"
+    },
+    "/cargoTransactions/{cargoTxId}": {
+      "schema": "CargoTransaction",
+      "description": "Collection of cargo freight and manifest tracking transactions"
+    },
+    "/manifests/{manifestId}": {
+      "schema": "Manifest",
+      "description": "Collection of verified maritime manifests with cryptographic QR verification"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of operational audit trail logs"
+    }
+  }
+}

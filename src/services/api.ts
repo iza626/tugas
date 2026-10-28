@@ -800,8 +800,31 @@ export const api = {
     return fetchWithAuth(`/manifests/voyage/${voyageId}`);
   },
   async verifyManifestQR(qrString: string): Promise<any> {
+    const clean = qrString.trim();
+    const token = getAuthToken();
+    try {
+      const res = await fetch(`${API_BASE}/manifests/verify-qr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ qr_string: clean }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    // Local fallback store lookup
     const store = getLocalStore();
-    const manifest = store.manifests.find((m: any) => m.qr_code_data === qrString || qrString.includes(m.manifest_number));
+
+    // 1. Check Manifest
+    const manifest = store.manifests.find(
+      (m: any) => m.qr_code_data === clean || clean.includes(m.manifest_number) || m.id === clean
+    );
     if (manifest) {
       const voyage = store.voyages.find((v: any) => v.id === manifest.voyage_id);
       const ship = store.ships.find((s: any) => s.id === voyage?.ship_id);
@@ -809,13 +832,94 @@ export const api = {
       const destPort = store.ports.find((p: any) => p.id === voyage?.destination_port_id);
       return {
         success: true,
-        message: 'Dokumen Manifest Terverifikasi!',
-        data: { manifest, voyage, ship, originPort, destPort },
+        doc_type: 'MANIFEST',
+        message: 'Dokumen Manifest Resmi Syahbandar Terverifikasi!',
+        data: { doc_type: 'MANIFEST', manifest, voyage, ship, originPort, destPort },
       };
     }
-    return fetchWithAuth('/manifests/verify-qr', {
+
+    // 2. Check Passenger Ticket
+    const ticket = store.passenger_transactions.find(
+      (t: any) => clean.includes(t.ticket_number) || t.id === clean
+    );
+    if (ticket) {
+      const passenger = store.passengers.find((p: any) => p.id === ticket.passenger_id);
+      const voyage = store.voyages.find((v: any) => v.id === ticket.voyage_id);
+      const ship = store.ships.find((s: any) => s.id === voyage?.ship_id);
+      const originPort = store.ports.find((p: any) => p.id === voyage?.origin_port_id);
+      const destPort = store.ports.find((p: any) => p.id === voyage?.destination_port_id);
+      return {
+        success: true,
+        doc_type: 'PASSENGER_TICKET',
+        message: 'Tiket Penumpang Resmi Terverifikasi!',
+        data: { doc_type: 'PASSENGER_TICKET', ticket, passenger, voyage, ship, originPort, destPort },
+      };
+    }
+
+    // 3. Check Cargo Document
+    const cargo = store.cargo_transactions.find(
+      (c: any) => clean.includes(c.document_number) || c.id === clean
+    );
+    if (cargo) {
+      const customer = store.customers.find((cust: any) => cust.id === cargo.customer_id);
+      const cargoType = store.cargo_types.find((ct: any) => ct.id === cargo.cargo_type_id);
+      const voyage = store.voyages.find((v: any) => v.id === cargo.voyage_id);
+      const ship = store.ships.find((s: any) => s.id === voyage?.ship_id);
+      const loadPort = store.ports.find((p: any) => p.id === cargo.loading_port_id);
+      const disPort = store.ports.find((p: any) => p.id === cargo.discharge_port_id);
+      return {
+        success: true,
+        doc_type: 'CARGO_DOCUMENT',
+        message: 'Dokumen Muatan / Bill of Lading Terverifikasi!',
+        data: {
+          doc_type: 'CARGO_DOCUMENT',
+          cargo,
+          customer,
+          cargoType,
+          voyage,
+          ship,
+          loadingPort: loadPort,
+          dischargePort: disPort,
+        },
+      };
+    }
+
+    throw new Error(`Data tidak ditemukan untuk kode "${clean}". Pastikan kode QR valid.`);
+  },
+
+  async checkInPassenger(ticketId: string, newStatus: string = 'Boarded'): Promise<any> {
+    return fetchWithAuth('/verify-qr/check-in-passenger', {
       method: 'POST',
-      body: JSON.stringify({ qr_string: qrString }),
+      body: JSON.stringify({ ticket_id: ticketId, new_status: newStatus }),
+    }).catch(() => {
+      // local fallback
+      const store = getLocalStore();
+      const ticket = store.passenger_transactions.find((t: any) => t.id === ticketId || t.ticket_number === ticketId);
+      if (ticket) {
+        ticket.boarding_status = newStatus;
+        saveLocalStore(store);
+        broadcastLocalEvent('PASSENGER_TRANSACTIONS_UPDATED', ticket);
+        return { success: true, message: `Status boarding diubah menjadi ${newStatus}!`, data: ticket };
+      }
+      throw new Error('Tiket tidak ditemukan');
+    });
+  },
+
+  async updateCargoStatus(cargoId: string, newStatus: string = 'Loaded'): Promise<any> {
+    return fetchWithAuth('/verify-qr/update-cargo-status', {
+      method: 'POST',
+      body: JSON.stringify({ cargo_id: cargoId, new_status: newStatus }),
+    }).catch(() => {
+      // local fallback
+      const store = getLocalStore();
+      const cargo = store.cargo_transactions.find((c: any) => c.id === cargoId || c.document_number === cargoId);
+      if (cargo) {
+        cargo.status = newStatus;
+        saveLocalStore(store);
+        broadcastLocalEvent('CARGO_TRANSACTIONS_UPDATED', cargo);
+        return { success: true, message: `Status muatan diubah menjadi ${newStatus}!`, data: cargo };
+      }
+      throw new Error('Muatan tidak ditemukan');
     });
   },
 

@@ -121,7 +121,7 @@ export const PortsView: React.FC = () => {
   const filteredPorts = ports.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.port_code.toLowerCase().includes(search.toLowerCase()) ||
+      (p.port_code || p.code || '').toLowerCase().includes(search.toLowerCase()) ||
       p.city.toLowerCase().includes(search.toLowerCase())
   );
 

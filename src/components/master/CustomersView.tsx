@@ -117,7 +117,7 @@ export const CustomersView: React.FC = () => {
   const filtered = customers.filter(
     (c) =>
       c.company_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.pic.toLowerCase().includes(search.toLowerCase()) ||
+      (c.pic || c.pic_name || '').toLowerCase().includes(search.toLowerCase()) ||
       c.phone.toLowerCase().includes(search.toLowerCase())
   );
 

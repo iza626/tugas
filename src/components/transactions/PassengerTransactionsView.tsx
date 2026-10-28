@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { PassengerTransaction, Voyage, Passenger, TicketClass, PaymentStatus, BoardingStatus, Ship } from '../../types';
 import { api } from '../../services/api';
 import { useRealtime } from '../../context/RealtimeContext';
-import { Ticket, Plus, Search, Edit2, Trash2, X, CheckCircle, RefreshCw, Users } from 'lucide-react';
+import { Ticket, Plus, Search, Edit2, Trash2, X, CheckCircle, RefreshCw, Users, QrCode } from 'lucide-react';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
+import { QRModal } from '../ui/QRModal';
 
 export const PassengerTransactionsView: React.FC = () => {
   const [transactions, setTransactions] = useState<PassengerTransaction[]>([]);
@@ -31,6 +32,8 @@ export const PassengerTransactionsView: React.FC = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [qrModalData, setQrModalData] = useState<any>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const { lastEvent, addToast } = useRealtime();
 
@@ -297,6 +300,27 @@ export const PassengerTransactionsView: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            onClick={() => {
+                              const passenger = passengers.find((p) => p.id === t.passenger_id);
+                              const voyage = voyages.find((v) => v.id === t.voyage_id);
+                              const ship = voyage ? ships.find((s) => s.id === voyage.ship_id) : null;
+                              setQrModalData({
+                                manifestNumber: t.ticket_number,
+                                voyageNumber: voyage?.voyage_number,
+                                shipName: ship?.name,
+                                qrDataString: `PORTIVA-AUTH:TICKET:${t.ticket_number}:NAME=${passenger?.full_name || ''}`,
+                                certifiedBy: `Tiket Penumpang (${t.class}) - Status: ${t.boarding_status}`,
+                                certifiedAt: t.transaction_date,
+                                totalPassengers: 1,
+                              });
+                              setIsQrModalOpen(true);
+                            }}
+                            title="Tampilkan Kode QR Tiket Penumpang"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleOpenEdit(t)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
                           >
@@ -466,6 +490,13 @@ export const PassengerTransactionsView: React.FC = () => {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
         isLoading={isDeleting}
+      />
+
+      {/* QR Code Boarding Pass Modal */}
+      <QRModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        manifestData={qrModalData}
       />
     </div>
   );

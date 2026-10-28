@@ -116,7 +116,7 @@ export const ReportsHub: React.FC<{ initialTab?: ReportTab; onNavigateToManifest
       const headers = ['No Dokumen', 'Nama Barang', 'Perjalanan', 'Berat (Ton)', 'Volume (m3)', 'Status Muatan'];
       const rows = cargoTrx.map((c) => {
         const v = voyages.find((x) => x.id === c.voyage_id);
-        return [c.document_number, c.item_name, v?.voyage_number || c.voyage_id, c.weight_ton, c.volume_m3, c.status];
+        return [c.document_number, c.item_name, v?.voyage_number || c.voyage_id, c.weight_ton, c.volume_m3 || 0, c.status];
       });
       exportCSV(`Laporan_Muatan_${new Date().toISOString().slice(0, 10)}`, headers, rows);
     } else if (activeTab === 'voyages') {

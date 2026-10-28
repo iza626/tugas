@@ -18,9 +18,12 @@ import {
   FileText,
   RefreshCw,
   Plus,
+  Camera,
+  Zap,
 } from 'lucide-react';
 import { QRModal } from '../ui/QRModal';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
+import { QRCodeScanner } from '../ui/QRCodeScanner';
 
 export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selectedVoyageId }) => {
   const [voyages, setVoyages] = useState<Voyage[]>([]);
@@ -30,6 +33,10 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
   const [certifying, setCertifying] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // View Mode: 'document' or 'scanner'
+  const [activeTab, setActiveTab] = useState<'document' | 'scanner'>('document');
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
 
   // QR Modal
   const [qrModalData, setQrModalData] = useState<any>(null);
@@ -208,6 +215,16 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Quick Scan Button */}
+          <button
+            onClick={() => setIsScannerModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-900 via-sky-800 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-blue-950/20"
+            title="Scan QR Code Kamera / File"
+          >
+            <Camera className="w-4 h-4 text-sky-300" />
+            <span>Scan QR Tiket / Kargo</span>
+          </button>
+
           <select
             value={currentVoyageId}
             onChange={(e) => setCurrentVoyageId(e.target.value)}
@@ -250,6 +267,47 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
         </div>
       </div>
 
+      {/* View Mode Toggle: Document vs Embedded Scanner */}
+      <div className="flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold gap-1 max-w-md print:hidden">
+        <button
+          onClick={() => setActiveTab('document')}
+          className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
+            activeTab === 'document'
+              ? 'bg-white text-blue-900 shadow-sm font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-blue-700" />
+          <span>Dokumen Manifest</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('scanner')}
+          className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
+            activeTab === 'scanner'
+              ? 'bg-blue-900 text-white shadow-sm font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Camera className="w-4 h-4 text-sky-400" />
+          <span>Live QR Scanner & Verifikator</span>
+        </button>
+      </div>
+
+      {/* Embedded QR Scanner when 'scanner' tab is active */}
+      {activeTab === 'scanner' && (
+        <div className="print:hidden">
+          <QRCodeScanner
+            isOpen={true}
+            embedded={true}
+            onClose={() => setActiveTab('document')}
+            onSelectManifestVoyage={(voyageId) => {
+              setCurrentVoyageId(voyageId);
+              setActiveTab('document');
+            }}
+          />
+        </div>
+      )}
+
       {actionSuccess && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 print:hidden">
           <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -257,6 +315,8 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
         </div>
       )}
 
+      {/* Manifest Document Section (visible when activeTab === 'document' or printing) */}
+      <div className={activeTab === 'scanner' ? 'hidden print:block' : 'block'}>
       {loading ? (
         <div className="bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
@@ -382,9 +442,20 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
                 <Users className="w-4 h-4 text-blue-600" />
                 Daftar Penumpang Kapal (Passenger Manifest)
               </h4>
-              <span className="text-xs text-slate-500">
-                {manifestDetail.passengers?.length || 0} Penumpang Tercatat
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsScannerModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1.5 transition-colors print:hidden shadow-2xs"
+                  title="Scan QR Tiket Penumpang untuk Gate Check-in"
+                >
+                  <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Scan Tiket Gate</span>
+                </button>
+                <span className="text-xs text-slate-500">
+                  {manifestDetail.passengers?.length || 0} Penumpang Tercatat
+                </span>
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -440,7 +511,18 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
                 <Package className="w-4 h-4 text-cyan-600" />
                 Daftar Muatan Barang & Kargo (Cargo Manifest)
               </h4>
-              <span className="text-xs text-slate-500">{manifestDetail.cargo?.length || 0} Kargo Tercatat</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsScannerModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 text-[11px] font-semibold flex items-center gap-1.5 transition-colors print:hidden shadow-2xs"
+                  title="Scan QR B/L Dokumen Muatan"
+                >
+                  <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                  <span>Scan B/L Muatan</span>
+                </button>
+                <span className="text-xs text-slate-500">{manifestDetail.cargo?.length || 0} Kargo Tercatat</span>
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -538,6 +620,7 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
           </div>
         </div>
       )}
+      </div>
 
       {/* Certification Confirmation Modal */}
       <ConfirmationModal
@@ -556,6 +639,17 @@ export const ManifestView: React.FC<{ selectedVoyageId?: string }> = ({ selected
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
         manifestData={qrModalData}
+      />
+
+      {/* Floating QR Code Scanner Modal */}
+      <QRCodeScanner
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        onSelectManifestVoyage={(voyageId) => {
+          setCurrentVoyageId(voyageId);
+          setActiveTab('document');
+          setIsScannerModalOpen(false);
+        }}
       />
     </div>
   );

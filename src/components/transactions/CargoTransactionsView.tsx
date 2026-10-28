@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { CargoTransaction, Voyage, Customer, CargoType, Port, CargoStatus, Ship } from '../../types';
 import { api } from '../../services/api';
 import { useRealtime } from '../../context/RealtimeContext';
-import { Truck, Plus, Search, Edit2, Trash2, X, CheckCircle, RefreshCw, Package, ArrowRight } from 'lucide-react';
+import { Truck, Plus, Search, Edit2, Trash2, X, CheckCircle, RefreshCw, Package, ArrowRight, QrCode } from 'lucide-react';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
+import { QRModal } from '../ui/QRModal';
 
 export const CargoTransactionsView: React.FC = () => {
   const [cargoList, setCargoList] = useState<CargoTransaction[]>([]);
@@ -38,6 +39,8 @@ export const CargoTransactionsView: React.FC = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [qrModalData, setQrModalData] = useState<any>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const { lastEvent, addToast } = useRealtime();
 
@@ -327,6 +330,27 @@ export const CargoTransactionsView: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            onClick={() => {
+                              const customer = customers.find((cust) => cust.id === c.customer_id);
+                              const voyage = voyages.find((v) => v.id === c.voyage_id);
+                              const ship = voyage ? ships.find((s) => s.id === voyage.ship_id) : null;
+                              setQrModalData({
+                                manifestNumber: c.document_number,
+                                voyageNumber: voyage?.voyage_number,
+                                shipName: ship?.name,
+                                qrDataString: `PORTIVA-AUTH:CARGO:${c.document_number}:ITEM=${c.item_name}:WEIGHT=${c.weight_ton}`,
+                                certifiedBy: `Dokumen Muatan Kargo (B/L) - ${customer?.company_name || 'Shipper'}`,
+                                certifiedAt: c.created_at || new Date().toISOString().split('T')[0],
+                                totalWeight: c.weight_ton,
+                              });
+                              setIsQrModalOpen(true);
+                            }}
+                            title="Tampilkan Kode QR Dokumen B/L Muatan"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 transition-colors"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => handleOpenEdit(c)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
                           >
@@ -584,6 +608,13 @@ export const CargoTransactionsView: React.FC = () => {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
         isLoading={isDeleting}
+      />
+
+      {/* QR Code Cargo B/L Modal */}
+      <QRModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        manifestData={qrModalData}
       />
     </div>
   );

@@ -121,7 +121,7 @@ export const PassengersView: React.FC = () => {
   const filtered = passengers.filter(
     (p) =>
       p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.identity_number.toLowerCase().includes(search.toLowerCase()) ||
+      (p.identity_number || p.id_number || '').toLowerCase().includes(search.toLowerCase()) ||
       p.phone.toLowerCase().includes(search.toLowerCase())
   );
 

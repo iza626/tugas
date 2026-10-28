@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Ship,
 } from 'lucide-react';
-import { QRScannerModal } from '../ui/QRModal';
+import { QRCodeScanner } from '../ui/QRCodeScanner';
 import { DatabaseSettingsModal } from '../database/DatabaseSettingsModal';
 
 interface HeaderProps {
@@ -146,7 +146,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate, cur
       </header>
 
       {/* Modals */}
-      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} />
+      <QRCodeScanner
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onSelectManifestVoyage={() => {
+          onNavigate('manifest');
+          setIsScannerOpen(false);
+        }}
+      />
       <DatabaseSettingsModal isOpen={isDbModalOpen} onClose={() => setIsDbModalOpen(false)} />
     </>
   );

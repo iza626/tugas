@@ -199,7 +199,7 @@ export const DashboardOverview: React.FC<{ onNavigate: (menu: string) => void }>
 
           <div className="space-y-3 pt-2">
             {stats?.passengersPerVoyage && stats.passengersPerVoyage.length > 0 ? (
-              stats.passengersPerVoyage.map((item, i) => {
+              stats.passengersPerVoyage.map((item: any, i: number) => {
                 const maxPassengers = 1500;
                 const percentage = Math.min(100, Math.max(8, (item.passenger_count / 10) * 100));
                 return (
@@ -244,7 +244,7 @@ export const DashboardOverview: React.FC<{ onNavigate: (menu: string) => void }>
 
           <div className="space-y-3 pt-2">
             {stats?.cargoPerVoyage && stats.cargoPerVoyage.length > 0 ? (
-              stats.cargoPerVoyage.map((item, i) => {
+              stats.cargoPerVoyage.map((item: any, i: number) => {
                 const percentage = Math.min(100, Math.max(10, (item.cargo_weight_ton / 150) * 100));
                 return (
                   <div key={i} className="space-y-1">
@@ -300,7 +300,7 @@ export const DashboardOverview: React.FC<{ onNavigate: (menu: string) => void }>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {stats?.recentVoyages && stats.recentVoyages.length > 0 ? (
-                stats.recentVoyages.map((v) => {
+                stats.recentVoyages.map((v: any) => {
                   let badge = 'bg-slate-100 text-slate-700 border-slate-200';
                   if (v.status === 'Scheduled') badge = 'bg-blue-50 text-blue-700 border-blue-200';
                   if (v.status === 'Boarding') badge = 'bg-amber-50 text-amber-700 border-amber-200';
